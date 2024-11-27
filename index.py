@@ -44,7 +44,7 @@ tone_color_converter.load_ckpt('checkpoints_v2/converter/checkpoint.pth')
 # Load base speakers
 base_speakers = ['en-au', 'en-br', 'en-default', 'en-india', 'en-newest', 'en-us', 'es', 'fr', 'jp', 'kr', 'zh']
 if device == "cpu":
-    base_speakers = ['en-newest']  # Load fewer models on CPU
+    base_speakers = ['en-br']  # Load fewer models on CPU
 
 key_map = {
     'en-newest': ('EN-Newest', 'EN_NEWEST'),
@@ -178,7 +178,6 @@ def synthesize_speech():
         return {"error": f"Accent {accent} not found."}, 400
 
     try:
-        # Check for reference speaker if needed
         matching_files = [file for file in os.listdir("resources") if file.startswith(voice)]
         if not matching_files:
             return {"error": "No matching voice found."}, 400
@@ -186,28 +185,22 @@ def synthesize_speech():
         reference_speaker = os.path.join('resources', matching_files[0])
         target_se, audio_name = se_extractor.get_se(reference_speaker, tone_color_converter, target_dir='processed', vad=True)
 
-        # Generate speech directly to memory
-        synthesized_audio = io.BytesIO()
-        model[accent].tts_to_memory(text, model[accent].hps.data.spk2id[key_map[accent][0]], synthesized_audio, speed=speed)
+        src_path = f'{output_dir}/tmp.wav'
+        save_path = f'{output_dir}/output_v2_{accent}.wav'
+        model[accent].tts_to_file(text, model[accent].hps.data.spk2id[key_map[accent][0]], src_path, speed=speed)
 
-        # Apply tone conversion directly in memory
-        final_audio = io.BytesIO()
         tone_color_converter.convert(
-            audio_src_buffer=synthesized_audio,
+            audio_src_path=src_path,
             src_se=source_se[accent],
             tgt_se=target_se,
-            output_buffer=final_audio,
+            output_path=save_path,
             message=watermark
         )
 
-        # Reset the buffer pointers
-        final_audio.seek(0)
-
-        return send_file(final_audio, as_attachment=True, mimetype="audio/wav")
+        return send_file(save_path, as_attachment=True, mimetype="audio/wav")
     except Exception as e:
         return {"error": str(e)}, 500
 
-
 # Run Flask App
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    app.run(host="0.0.0.0", port=8001)

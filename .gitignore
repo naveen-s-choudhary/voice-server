@@ -1,0 +1,8 @@
+# Ignore the processed folder
+processed/
+
+# Ignore the outputs folder
+outputs/
+
+#Ignore checkpoints_v2 folder as well
+checkpoints_v2/
